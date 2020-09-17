@@ -1,0 +1,144 @@
+---
+title: "Triathlons"
+author: "Heather Lendway"
+date: "9/13/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+#knitr::opts_chunk$set(error = TRUE, warning=FALSE, message=FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(gganimate)
+library(plotKML)
+library(lubridate)
+library(maps) 
+library(ggmap)
+library(gifski)
+library(ggthemes)
+```
+
+
+### Swims
+```{r}
+panama_bike_20160131 <- readGPX("data/20160131_tri_bike.gpx")
+panama_swim_20160131 <- readGPX("data/20160131_tri_swim.gpx")
+panama_run_20160131 <- readGPX("data/20160131_tri_run.gpx")
+
+
+panama_bike_20160131_clean <- panama_bike_20160131[["tracks"]][[1]][["Cycling"]] %>% 
+  mutate(ele = as.numeric(ele),
+         event = "Bike",
+         date = ymd(str_sub(time, start=1,end=10)),
+         hrminsec = ymd_hms(paste(date,str_sub(time, start=12,end=19))))
+panama_swim_20160131_clean <- panama_swim_20160131[["tracks"]][[1]][["Open Water Swimming"]] %>% 
+  mutate(ele = NA,
+         event = "Swim",
+         date = ymd(str_sub(time, start=1,end=10)),
+         hrminsec = ymd_hms(paste(date,str_sub(time, start=12,end=19))))
+panama_run_20160131_clean <- panama_run_20160131[["tracks"]][[1]][["Running"]] %>% 
+  mutate(ele = as.numeric(ele),
+         event = "Run",
+         date = ymd(str_sub(time, start=1,end=10)),
+         hrminsec = ymd_hms(paste(date,str_sub(time, start=12,end=19))))
+panana_20160131 <- panama_swim_20160131_clean %>% 
+  bind_rows(panama_bike_20160131_clean,
+            panama_run_20160131_clean,
+            .id = "order_of_events") %>% 
+  mutate(event = as_factor(event,levels=c("Swim","Bike","Run")))
+
+#get lat lon one of these ways
+# https://www.latlong.net/
+max(panana_20160131$lon)
+min(panana_20160131$lon)
+max(panana_20160131$lat)
+min(panana_20160131$lat)
+panama_map <- get_stamenmap(
+    bbox = c(left = -79.56, bottom = 8.90, right = -79.51, top = 8.99), 
+    maptype = "watercolor", #terrain
+    zoom = 16
+)
+```
+
+
+Static map
+```{r,fig.width=10,fig.height=6}
+citation("ggmap")
+
+ggmap(panama_map) +
+  geom_path(data = panana_20160131,
+             mapping=aes(x=lon, y=lat, 
+                         group = event, 
+                         color = event),
+            size=1.5) +
+  facet_wrap(vars(event)) +
+  theme_map() +
+  theme_minimal() +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        legend.position="none")
+
+```
+
+
+# One Map
+```{r,fig.height=6,fig.width=10}
+
+ggmap(panama_map) +
+  geom_path(data = panana_20160131,
+             mapping=aes(x=lon, y=lat, 
+                         group = event,
+                         color = event), #color = ele.num - # make this person
+            size = 1.5) + # 
+  geom_point(data = panana_20160131,
+             aes(x=lon, y=lat), # group = day_of_ride
+             color = "red", 
+             size = 2.5) + #label? Icon?
+  theme_minimal() +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        legend.title = element_blank(),
+        legend.position="bottom") + 
+  xlab("") +
+  ylab("") +
+  transition_reveal(hrminsec)
+anim_save("panama_20160131.gif")
+```
+
+# Facet Style
+```{r,fig.height=6,fig.width=10}
+ggmap(panama_map) +
+  geom_path(data = panana_20160131,
+             mapping=aes(x=lon, y=lat, 
+                         group = event,
+                         color = event), #color = ele.num - # make this person
+            size = 1.5) + # 
+  geom_point(data = panana_20160131,
+             aes(x=lon, y=lat), 
+             color = "red", 
+             size = 2.5) + #label? Icon?
+  facet_wrap(vars(event)) +
+  theme_minimal() +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        legend.position="none") + 
+  xlab("") +
+  ylab("") +
+  transition_reveal(hrminsec)
+
+anim_save("panama_facet_20160131.gif")
+```
